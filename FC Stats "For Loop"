@@ -1,0 +1,82 @@
+import scipy.io
+import seaborn as sns
+import pandas as pd
+import matplotlib.pyplot as plt
+import io
+import numpy as np
+
+#subId = [3107,3102,3108,3113,3118,3119,3120,3122,3123,3124,3128,3131,3132,3310,3318,3327,3350,3352,3353,3356,3360,3366,3373,3374,3377,3383,3385,3387,3389,3390,3392,3552,3554,3556,3557,3563,3571,3573,3574,3575,3577,3580,3582,3585,3588,3589,3591,3758,3771,3779,3818,3820,3821,3824,3825,3826,3828,3830,3834,3835,3836,3838,3863,3871,4013,4018,4019,4021,4030,4035,14426,16644,40360,50143,50222,50225,51302,60024,60033,60035,60036,60041,60043,60044,60070,60073,60074,60075];
+subId = [3107,3102,3120];
+
+myValues = [[]];
+
+for x in subId:
+    all = np.loadtxt('/Users/ethanburkett/Desktop/PdDataCases/'+str(x)+'/'+str(x)+'_norm.txt')
+
+    filename ='/Users/ethanburkett/Desktop/Pd_Region_Labels.txt'
+    list_ = open(filename).read().split()
+    region = list_[1::2]
+    
+    #fc = np.ones((92,92))
+    #for i in range(92):
+     #    for j in range(92):
+     #       fc[i,j] = np.corrcoef(all[:,i], all[:,j])
+    
+    df = pd.DataFrame(all, columns = range(92))
+    corr_df = df.corr(method='pearson')
+    fig = plt.figure(figsize=(15,12),dpi = 300)
+    axes = fig.add_subplot(111)
+
+    #Selecting only lower triangle matrix by assigning true/false values instead of zero mask (as before) 
+    #Generating mask for diagonal 
+    fc = corr_df.where(np.tril(np.ones(corr_df.shape)).astype(bool))
+    mask_ut=np.triu(np.ones(corr_df.shape)).astype(bool)
+    hmap=sns.heatmap(fc, mask = mask_ut, cmap="coolwarm", annot = False, xticklabels=region[:92], yticklabels=region[:92])
+    plt.savefig('/Users/ethanburkett/Desktop/PdDataCases/'+str(x)+'/'+str(x)+'_FCmatrix.png')
+    plt.show()
+    
+    #Statistics processing - flattening array for histogram and calculations, and including negatives+positives
+    ff = np.array(fc).flatten(order='A')
+    fc_ff = [f for f in ff if f < 1 and f >-1]
+    
+    
+    # mean
+    mean_fc = np.mean(fc_ff)
+    print(f"The mean of the FC is {mean_fc}")
+    
+    
+    # histogram
+    fig = plt.figure(figsize=(5,5),dpi = 300)
+    axes = fig.add_subplot(111)
+    axes.set_title("Histogram of the FC Distribution")
+    sns.histplot(fc_ff, ax=axes)
+    plt.savefig('/Users/ethanburkett/Desktop/PdDataCases/'+str(x)+'/'+str(x)+'_FChistogram.png')
+    plt.show()
+    
+    # pairs
+    fc.columns = region[:92]
+    fc.index = region[:92]
+    
+    #for the max
+    max_fc = pd.DataFrame(columns=["from", "to", "value"])
+    for i in region[:92]:
+        max_v = fc[i].nlargest(2)
+        print(f"The positive highest correlation value between {max_v.index[0]} and {max_v.index[1]} is {max_v[1]}")
+        _fc = pd.DataFrame.from_dict([{"from": max_v.index[0], "to": max_v.index[1], "value": max_v[1]}])
+        max_fc = pd.concat([max_fc, _fc], ignore_index=True)
+    max_fc.to_excel('/Users/ethanburkett/Desktop/PdDataCases/'+str(x)+'/'+str(x)+'max_fc.xlsx') ########### plz change the path
+
+    
+    # for the lowest
+    min_fc = pd.DataFrame(columns=["from", "to", "value"])
+    for i in region[:92]:
+        min_v = fc[i].idxmin()
+        print(f"The negative highest anticorrelation value between {i} and {min_v} is {fc.loc[min_v, i]}")
+        _fc = pd.DataFrame.from_dict( [{"from": i, "to": min_v, "value": fc.loc[min_v, i] }] )
+        min_fc = pd.concat([min_fc, _fc], ignore_index=True)
+    min_fc.to_excel('/Users/ethanburkett/Desktop/PdDataCases/'+str(x)+'/'+str(x)+'min_fc.xlsx') ########### plz change the path
+
+    myValues.append([x,mean_fc]);
+    
+df = pd.DataFrame(myValues);
+df.to_csv('/Users/ethanburkett/Desktop/PdDataCases/fcyess2.csv');
