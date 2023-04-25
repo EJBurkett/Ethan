@@ -1,0 +1,58 @@
+#quality assurance TEST
+#Variance Quality Assurance 
+#T - test QA
+
+import scipy.io
+import seaborn as sns
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy import stats  
+from scipy.stats import ttest_rel
+
+subId = [3107,3102,3108,3113,3118,3119,3120,3122,3123,3124,3128,3131,3132,3310,3318,3327,3350,3352,3353,3356,3360,3366,3373,3374,3377,3383,3385,3387,3389,3390,3392,3552,3554,3556,3557,3563,3571,3573,3574,3575,3577,3580,3582,3585,3588,3589,3591,3758,3771,3779,3818,3820,3821,3824,3825,3826,3828,3830,3834,3835,3836,3838,3863,3871,4013,4018,4019,4021,4030,4035,14426,16644,40360,50143,50222,50225,51302,60024,60033,60035,60036,60041,60043,60044,60070,60073,60074,60075];
+#subId = [3107,3102,3108];
+
+myValues = [[]];
+
+for x in subId:
+    all = np.loadtxt('/Users/ethanburkett/Desktop/PdDataCases/'+str(x)+'/tvb_inputs/rfMRI.ica/ts.txt')
+    
+    dfNon = pd.DataFrame(all, columns = range(92))
+    arrayVarNon=dfNon.to_numpy().flatten()
+    print(arrayVarNon.var())
+    
+    
+    #histogram
+    fig = plt.figure(figsize=(5,5),dpi = 300)
+    axes = fig.add_subplot(111)
+    axes.set_title("The Histogram of the variability")
+    sns.histplot(arrayVarNon, ax=axes)
+    plt.savefig('/Users/ethanburkett/Desktop/PdDataCases/'+str(x)+'/'+str(x)+'_plotNon.png', format="png")
+    plt.show()
+    
+
+
+    all = np.loadtxt('/Users/ethanburkett/Desktop/PdDataCases/'+str(x)+'/'+str(x)+'_norm.txt')
+    
+    dfNorm = pd.DataFrame(all, columns = range(92))
+    arrayVarNorm=dfNorm.to_numpy().flatten()
+    print(arrayVarNorm.var())
+    
+    #histogram
+    fig = plt.figure(figsize=(5,5),dpi = 300)
+    axes = fig.add_subplot(111)
+    axes.set_title("The Histogram of the variability")
+    sns.histplot(arrayVarNorm, ax=axes)
+    plt.savefig('/Users/ethanburkett/Desktop/PdDataCases/'+str(x)+'/'+str(x)+'_plotNorm.png', format="png")
+    plt.show()
+    
+
+    #Dependent T-test between original and normalized ts for each sub. - in apppend values
+    #print(ttest_rel(arrayVarNon,arrayVarNorm)[0]) - test stat.
+    #print(ttest_rel(arrayVarNon,arrayVarNorm)[1]) - p-value
+
+    myValues.append([x,arrayVarNon.var(),arrayVarNorm.var(),ttest_rel(arrayVarNon,arrayVarNorm)[0],ttest_rel(arrayVarNon,arrayVarNorm)[1]]);
+    
+df = pd.DataFrame(myValues);
+df.to_csv('/Users/ethanburkett/Desktop/PdDataCases/foo.csv');
