@@ -1,0 +1,140 @@
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill
+
+# List of subject IDs
+subId = [3390,3102,3113]
+
+
+# Number of clusters for each subject
+num_clusters = 3  
+
+# Establish specific regions to highlight in excel
+regions_to_highlight = ['RH_Putamen', 'LH_Putamen', 'RH_Caudate', 'LH_Caudate', 'RH_Pallidum', 'LH_Pallidum', 'RH_Accumbens', 'LH_Accumbens']
+
+for x in subId:
+    # Load the fMRI data for each subject
+    all_data = np.loadtxt('/Users/ethanburkett/Desktop/PdDataCases/' + str(x) + '/' + str(x) + '_norm.txt')
+
+    # Region labels
+    filename = '/Users/ethanburkett/Desktop/Pd_Region_Labels.txt'
+    list_ = open(filename).read().split()
+    region = list_[1::2]
+    
+    # Compute correlation data for each subject
+    df = pd.DataFrame(all_data, columns=range(92))
+    corr_df = (df.corr(method='pearson'))
+       
+    
+    # Visualize the correlation matrix
+    fig = plt.figure(figsize=(15, 12), dpi=300)
+    axes = fig.add_subplot(111)
+    hmap = sns.heatmap(corr_df, cmap="coolwarm", annot=False, xticklabels=region[:92], yticklabels=region[:92])   
+    plt.title(f'Subject {x} - Functional Connectivity Matrix')
+    plt.show()
+
+    # Perform K-Means clustering over correlation matrix and store cluster results in array
+    kmeans = KMeans(n_clusters=num_clusters)
+    cluster_labels = kmeans.fit_predict(corr_df.values)
+    cluster_labels_np = np.array(cluster_labels)
+   
+    
+    # Create separate dataframe for cluster results
+    df2 = pd.DataFrame(columns=['Region', 'Cluster'])
+    df2['Region'] = region[:92]
+    df2['Cluster'] = cluster_labels 
+     
+    
+    # Create a new DataFrame with 'Region' as the index and columns
+    df_reordered = pd.DataFrame(corr_df.values, columns=region[:92], index=region[:92])
+   
+    
+    # Sort the rows and columns based on cluster_labels_np array 
+    df_reordered = df_reordered.iloc[np.argsort(cluster_labels_np)]
+    df_reordered = df_reordered[df_reordered.columns[np.argsort(cluster_labels_np)]]
+    
+
+    # Visualize the reordered correlation matrix
+    fig = plt.figure(figsize=(15, 12), dpi=300)
+    axes = fig.add_subplot(111)
+    hmap = sns.heatmap(df_reordered, cmap="coolwarm", annot=False, xticklabels=True, yticklabels=True)
+    plt.title(f'Subject {x} - Cluster Organized Functional Connectivity Matrix')
+    plt.savefig('/Users/ethanburkett/Desktop/Clustering/'+str(x)+'_FCmatrixOrg.png')
+    plt.show()
+    
+    # Visualize the reordered and masked matrix
+    fig = plt.figure(figsize=(15, 12), dpi=300)
+    axes = fig.add_subplot(111)
+    fc =df_reordered.where(np.tril(np.ones(corr_df.shape)).astype(bool))
+    mask_ut=np.triu(np.ones(df_reordered.shape)).astype(bool)
+    hmap=sns.heatmap(fc, mask = mask_ut, cmap="coolwarm", annot = False, xticklabels=True, yticklabels=True)
+    plt.title(f'Subject {x} - Cluster Organized Functional Connectivity Matrix')
+    plt.savefig('/Users/ethanburkett/Desktop/Clustering/'+str(x)+'_FCmatrixLTorg.png')
+    plt.show()
+
+    # Use dataframe df2 for New DataFrame with highlighting for the specific regions
+    highlighted_df = df2[df2['Region'].isin(regions_to_highlight)]
+    
+
+    # New excel
+    wb = Workbook()
+    ws = wb.active
+    
+    ws['A1'] = 'Region'
+    ws['B1'] = 'Cluster'
+
+    # Data from df2 to the excel and cell background color highlighting
+    for r_idx, row in enumerate(df2.iterrows(), start=2):
+        for c_idx, cell_value in enumerate(row[1], start=1):
+            cell = ws.cell(row=r_idx, column=c_idx, value=cell_value)
+            # Check, if region should be highlighted
+            if cell_value in regions_to_highlight:
+                yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+                cell.fill = yellow_fill
+
+    # Cluster columns with an empty column in between
+    cluster_col_start = len(highlighted_df.columns) + 2
+    for cluster_num in range(num_clusters):
+        cluster_col = df2[df2['Cluster'] == cluster_num]['Region'].reset_index(drop=True)
+        cluster_col_name = f'Cluster_{cluster_num + 1}'
+        ws.cell(row=1, column=cluster_col_start, value=cluster_col_name)
+        for r_idx, region_name in enumerate(cluster_col, start=1):
+            cell = ws.cell(row=r_idx + 1, column=cluster_col_start, value=region_name)
+            # Check, if region should be highlighted
+            if region_name in regions_to_highlight:
+                yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+                cell.fill = yellow_fill
+        cluster_col_start += 2  
+
+    # Save the excel file with cluster index for each region as primary column and cluster columns 
+    excel_file_path = '/Users/ethanburkett/Desktop/Clustering/' + str(x) + '_clustering_results1.xlsx'
+    wb.save(excel_file_path)    
+        
+    
+    # Utilize unique labels and colors for cluster centroid
+    unique_labels = set(kmeans.labels_)
+    colors = plt.cm.coolwarm(np.linspace(0, 1, len(unique_labels)))
+    plt.figure(figsize=(8, 6))
+    
+    # Plot data points with cluster colors
+    for label, color in zip(unique_labels, colors):
+        plt.scatter(corr_df.values[kmeans.labels_ == label, 0], corr_df.values[kmeans.labels_ == label, 1], c=[color], edgecolors='k', label = f'Cluster {label}')
+    
+    # Plot cluster centers with colors
+    for label, cluster_center, color in zip(unique_labels, kmeans.cluster_centers_, colors):
+        plt.scatter(cluster_center[0], cluster_center[1], marker='x', 
+                    s=100, c= [color])
+    plt.scatter([], [], marker='x', s=100, c='black', label='Cluster Centers')
+    
+    plt.xlabel('Functional Connectivity (FC)')
+    plt.ylabel('FC')
+    plt.title(' ' + str(x) + ' KMeans Clustering K = 3')
+    plt.legend()
+    plt.savefig('/Users/ethanburkett/Desktop/Clustering/' + str(x) + '_KmeansCentroid1.png')
+    plt.show()
+    
