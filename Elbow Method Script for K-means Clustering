@@ -1,0 +1,67 @@
+import numpy as np
+import pandas as pd
+from sklearn.cluster import KMeans
+import matplotlib.pyplot as plt
+from kneed import KneeLocator
+import seaborn as sns
+
+# List of subject IDs
+subId = [3107, 3102, 3108, 3113]
+
+MyValues = [[]] 
+
+# Number of clusters for each subject 
+min_clusters = 1
+max_clusters = 10
+
+# Initialize empty lists to store WCSS values for each subject
+wcss_values = []
+
+optimal_k_values = []
+
+
+for x in subId:
+    # Load the fMRI data for each subject
+    all_data = np.loadtxt('/Users/ethanburkett/Desktop/PdDataCases/' + str(x) + '/' + str(x) + '_norm.txt')
+
+    # Compute correlation data for each subject
+    df = pd.DataFrame(all_data, columns=range(92))
+    corr_df = (df.corr(method='pearson'))
+    
+
+    # Calculate WCSS for different numbers of clusters
+    wcss = []
+    for num in range(min_clusters, max_clusters + 1):
+        kmeans = KMeans(n_clusters=num, random_state=0)
+        kmeans.fit(corr_df)
+        wcss.append(kmeans.inertia_)
+    
+    # Store the WCSS values for this subject
+    wcss_values.append(wcss)
+    
+
+    # compute the point at which the knee occurs, the WCSS values stop decreasing sig
+    z = range(min_clusters, max_clusters + 1)
+    kn = KneeLocator(z, wcss, curve='convex', direction='decreasing')
+    optimal_num_clusters = kn.elbow
+
+    # Print the optimal number of clusters for the subject
+    print(f"Subject {x}: Optimal Number of Clusters = {optimal_num_clusters}")
+
+    
+    # Plot the elbow method graph for each subject
+    plt.figure(figsize=(8, 6))
+    plt.plot(range(min_clusters, max_clusters + 1), wcss, marker='o', linestyle='-')
+    plt.title(f' {x} - Elbow Method')
+    plt.xlabel('Number of Clusters')
+    plt.ylabel('WCSS')
+    plt.grid(True)
+    plt.savefig('/Users/ethanburkett/Desktop/Clustering/' + str(x) + '_FCElbow.png')
+    plt.show()
+    
+    MyValues.append([x,optimal_num_clusters]);
+    optimal_k_values.append(optimal_num_clusters)
+    
+df2 = pd.DataFrame(MyValues)  
+df2.to_excel('/Users/ethanburkett/Desktop/Clustering/OptimalNumberOfClustersByElbow.xlsx', index = False)
+  
